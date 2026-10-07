@@ -1,0 +1,35 @@
+id: pluto
+title: ADALM-PLUTO
+vendor: Analog Devices
+part: ADALM-PLUTO
+usb_vendor: "0456"
+usb_product: "b673"
+soapy_driver: plutosdr
+device_name: ADALM-PLUTO
+center_hz: 915000000
+sample_rate: 2000000
+tone_offset_hz: 100000
+rx_lna_db: 30
+rx_vga_db: 0
+txvga_db: -10
+max_tx_db: -5
+max_tx_ms: 200
+rx_ms: 400
+min_snr_db: 10.0
+requires_env: HIL_LOOPBACK
+control_buses:
+  - id: usb
+    role: program
+    tool: iio
+  - id: soapy
+    role: runtime
+    tool: SoapySDR
+image_paths:
+  - id: tx-rx-loopback
+    primary: true
+    note: TX–RX SMA cable with attenuator. Set HIL_LOOPBACK=1. Stages stay closed until hackrf image passes.
+phase_seeds_s:
+  fixture: 2
+  tx: 1
+  rx: 2
+  analyze: 1

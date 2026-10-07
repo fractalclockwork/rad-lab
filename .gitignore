@@ -1,0 +1,15 @@
+.venv/
+.tools/
+archive/cache/
+reports/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+labs/**/.ipynb_checkpoints/
+*.iq
+*.cfile

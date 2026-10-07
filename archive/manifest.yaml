@@ -1,0 +1,43 @@
+# Local cache index. Bytes live in archive/cache/ and are not committed.
+# sha256 is filled in archive/cache/status.json after a successful fetch.
+items:
+  - id: hackrf-one-docs-index
+    kind: doc
+    board: hackrf
+    url: https://hackrf.readthedocs.io/en/latest/index.html
+    path: archive/cache/docs/hackrf/readthedocs-index.html
+    sha256: ""
+    license: vendor-docs
+    optional: true
+  - id: hackrf-hardware-overview
+    kind: doc
+    board: hackrf
+    url: https://hackrf.readthedocs.io/en/latest/hardware_components.html
+    path: archive/cache/docs/hackrf/hardware_components.html
+    sha256: ""
+    license: vendor-docs
+    optional: true
+  - id: hackrf-opera-cake
+    kind: doc
+    board: hackrf
+    url: https://hackrf.readthedocs.io/en/latest/opera_cake.html
+    path: archive/cache/docs/hackrf/opera_cake.html
+    sha256: ""
+    license: vendor-docs
+    optional: true
+  - id: pluto-user-guide
+    kind: doc
+    board: pluto
+    url: https://wiki.analog.com/university/tools/pluto/users
+    path: archive/cache/docs/pluto/users.html
+    sha256: ""
+    license: vendor-docs
+    optional: true
+  - id: pluto-hardware
+    kind: doc
+    board: pluto
+    url: https://wiki.analog.com/university/tools/pluto/hacking/hardware
+    path: archive/cache/docs/pluto/hardware.html
+    sha256: ""
+    license: vendor-docs
+    optional: true
