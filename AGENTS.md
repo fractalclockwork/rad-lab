@@ -9,10 +9,13 @@ This repository uses a **host-gated, staged** bring-up. Agents must treat `repor
 3. Run `make stage BOARD=hackrf STAGE=present|workflow` when USB hardware may be attached.
 4. Run `make hil` / `STAGE=image` **only** when `HIL_LOOPBACK=1` is set and the operator has confirmed an attenuator cable from TX to RX.
 5. Use `RAD_LAB_HIL_SIM=1` for image-stage dry runs in CI or when no RF hardware is present (still requires `HIL_LOOPBACK=1`).
+6. Run `make firmware BOARD=hackrf` **only** when `HIL_FIRMWARE=1` is set and the operator has confirmed the correct HackRF One is on USB.
 
 ## Forbidden
 
 - Setting `HIL_LOOPBACK=1` without an attenuator/cable path (do not invent operator assent).
+- Setting `HIL_FIRMWARE=1` without operator confirmation of the DUT identity.
+- Entering DFU or running `dfu-util` unless `hackrf_spiflash` has already failed.
 - Raising `txvga_db` above `max_tx_db` in board YAML for a “stronger” signal.
 - Antenna TX, outdoor TX, or amplifier-enabled TX from default stages.
 - Skipping stage order (`present` → `workflow` → `image`) or running Pluto before HackRF `image` passes.
@@ -29,6 +32,9 @@ This repository uses a **host-gated, staged** bring-up. Agents must treat `repor
 
 ```bash
 make check
+make archive && make image
+HIL_FIRMWARE=1 make firmware BOARD=hackrf                # SPI flash; then RESET
+make firmware BOARD=hackrf                               # verify 2026.01.3
 make stage BOARD=hackrf STAGE=present
 make stage BOARD=hackrf STAGE=workflow
 HIL_LOOPBACK=1 RAD_LAB_HIL_SIM=1 make hil BOARD=hackrf   # no RF
@@ -37,4 +43,4 @@ HIL_LOOPBACK=1 make hil BOARD=hackrf                     # real loopback
 
 ## Container
 
-`make image` builds `rad-lab-sdr`. Prefer host Soapy/hackrf tools when installed. Mount USB only with `--privileged -v /dev/bus/usb:/dev/bus/usb` when probing from the container.
+`make image` builds `rad-lab-sdr` with HackRF host tools from release **2026.01.3**. Prefer those tools for firmware work. Mount USB with `--privileged -v /dev/bus/usb:/dev/bus/usb` when probing or flashing from the container.

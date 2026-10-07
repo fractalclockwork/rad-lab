@@ -4,7 +4,7 @@ Board pages, lessons, the local archive, and the host-driven hardware-in-the-loo
 
 | Topic | Page |
 | --- | --- |
-| Boards | [hackrf](boards/hackrf.md), [pluto](boards/pluto.md), [accessories](boards/accessories.md) |
+| Boards | [hackrf](boards/hackrf.md), [pluto](boards/pluto.md), [fl2000](boards/fl2000.md), [accessories](boards/accessories.md) |
 | Concepts | [Lessons](learn/README.md) |
 | Cached manuals | [Archive](../archive/README.md) |
 | Stages and container | [Pipeline](pipeline.md) |

@@ -29,6 +29,7 @@ flowchart LR
 | `make sim BOARD=<id>` | Software DSP fixture only |
 | `make stage BOARD=<id> STAGE=<name>` | One of `present`, `workflow`, `image` |
 | `make hil BOARD=<id>` | The `image` stage |
+| `make firmware BOARD=hackrf` | SPI-flash / verify firmware (`HIL_FIRMWARE=1` to write) |
 | `make check` | pytest, then `make sim` for `hackrf` |
 
 `BOARD` defaults to `hackrf`. `STAGE` defaults to `present`.
@@ -57,6 +58,8 @@ Board order is fixed: `hackrf`, then `pluto`. Any stage on a later board is refu
 | Variable | When |
 | --- | --- |
 | `HIL_LOOPBACK` | Must be `1` before `image`. Operator asserts attenuator/cable TX→RX |
+| `HIL_FIRMWARE` | Must be `1` before SPI flash. Operator asserts the correct HackRF is on USB |
+| `HACKRF_SERIAL` | Optional override of `expected_serial` in `boards/hackrf.yaml` |
 | `RAD_LAB_HIL_SIM` | Set to `1` for software-only image stage (tests / no hardware) |
 
 ## Container

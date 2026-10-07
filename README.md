@@ -47,8 +47,14 @@ The **dev-host** runs `make stage` and owns USB probing and HIL checks. The **co
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 make archive
-make image          # builds rad-lab-sdr
+make image          # builds rad-lab-sdr (HackRF tools 2026.01.3)
 make check          # pytest + software fixture
+
+# Firmware (SPI) — operator must confirm the DUT first:
+export HIL_FIRMWARE=1
+make firmware BOARD=hackrf
+# RESET the HackRF, then verify:
+make firmware BOARD=hackrf
 
 # With HackRF on USB and attenuator path wired:
 export HIL_LOOPBACK=1
@@ -64,7 +70,7 @@ make hil BOARD=hackrf
 | [HackRF One](docs/boards/hackrf.md) | GSG / hackrf.readthedocs.io | First target |
 | [ADALM-PLUTO](docs/boards/pluto.md) | Analog Devices | After HackRF image |
 
-Supporting hardware (amps, splitters, analyzers, USB-VGA DAC) is cataloged in docs as accessories until a clear probe exists.
+Supporting hardware (amps, splitters, analyzers, [FL2000 USB-VGA DAC](docs/boards/fl2000.md), Baofeng UV-5R+PLUS) is cataloged in docs as accessories until a clear probe exists.
 
 ## Documentation
 
@@ -79,4 +85,5 @@ Supporting hardware (amps, splitters, analyzers, USB-VGA DAC) is cataloged in do
 - HackRF One
 - ADALM-PLUTO
 - Supporting HW: chip frequency generators, amplifiers, circulators/splitters/mixers, spectrum analyzer, network analyzer
-- USB-VGA DAC
+- USB-VGA DAC ([FL2000 / osmo-fl2k](docs/boards/fl2000.md); baseband TX ~DC–50 MHz; not FM-BCB/VHF)
+- Baofeng UV-5R+PLUS

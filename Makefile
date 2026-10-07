@@ -9,7 +9,7 @@ endif
 IMAGE ?= rad-lab-sdr
 export PYTHONPATH := $(CURDIR)/scripts:$(PYTHONPATH)
 
-.PHONY: archive archive-image image stage sim hil check venv
+.PHONY: archive archive-image image stage sim hil firmware check venv
 
 venv:
 	$(PYTHON) -m venv .venv
@@ -19,7 +19,7 @@ venv:
 archive:
 	$(PYTHON) scripts/archive.py
 
-image:
+image: archive
 	docker build -t $(IMAGE) -f docker/sdr/Dockerfile .
 
 archive-image: image
@@ -36,6 +36,9 @@ build:
 
 hil:
 	$(PYTHON) scripts/stage.py --board $(BOARD) --stage image
+
+firmware:
+	$(PYTHON) scripts/firmware.py --board $(BOARD)
 
 check:
 	$(PYTHON) -m pytest -q

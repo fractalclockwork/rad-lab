@@ -5,3 +5,4 @@ Concepts for the rad-lab SDR bring-up. Worked numbers use the HackRF defaults in
 1. [Sampling and IQ](01-sampling-and-iq.md)
 2. [HackRF bring-up](02-hackrf-bring-up.md)
 3. [Loopback HIL](03-loopback-hil.md)
+4. [Baofeng simplex HIL](04-baofeng-simplex-hil.md)

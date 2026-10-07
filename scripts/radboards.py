@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ORDER = ("hackrf", "pluto")
 STAGES = ("present", "workflow", "image")
 # Cataloged accessories are documented but not accepted by make stage.
-ACCESSORIES = ("amp", "splitter", "analyzer", "usb-vga-dac")
+ACCESSORIES = ("amp", "splitter", "analyzer", "usb-vga-dac", "uv-5r-plus")
 
 
 def board_path(board_id):

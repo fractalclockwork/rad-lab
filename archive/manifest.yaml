@@ -41,3 +41,13 @@ items:
     sha256: ""
     license: vendor-docs
     optional: true
+  - id: hackrf-2026.01.3
+    kind: sdk
+    board: hackrf
+    url: https://github.com/greatscottgadgets/hackrf/releases/download/v2026.01.3/hackrf-2026.01.3.tar.xz
+    path: archive/cache/sdk/hackrf-2026.01.3.tar.xz
+    sha256: d2b76a1115d9b4df648c29efb2f3c8e80009b7cf9a8adf37abbfdba72101b086
+    license: gpl-2.0
+    extract: true
+    extract_dir: archive/cache/sdk/hackrf-2026.01.3
+    extract_marker: archive/cache/sdk/hackrf-2026.01.3/firmware-bin/hackrf_one_usb.bin

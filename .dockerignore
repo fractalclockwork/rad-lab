@@ -1,8 +1,11 @@
 .venv/
 .tools/
-archive/cache/
 reports/
 .git/
 .pytest_cache/
 __pycache__/
 *.pyc
+# Keep release tarball for building matching host tools; ignore the rest of cache.
+archive/cache/**
+!archive/cache/sdk/
+!archive/cache/sdk/hackrf-2026.01.3.tar.xz

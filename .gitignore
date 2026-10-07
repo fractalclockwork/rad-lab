@@ -13,3 +13,4 @@ htmlcov/
 labs/**/.ipynb_checkpoints/
 *.iq
 *.cfile
+local.env
