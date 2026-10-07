@@ -82,8 +82,9 @@ def extract_item(item):
     elif name.endswith(".zip"):
         import zipfile
 
+        # ZIP releases (e.g. plutosdr-fw) unpack flat; extract into extract_dir.
         with zipfile.ZipFile(archive_path) as archive:
-            archive.extractall(path=extract_dir.parent)
+            archive.extractall(path=extract_dir)
     else:
         print(f"fail {item['id']}: unsupported archive type {name}", file=sys.stderr)
         return False

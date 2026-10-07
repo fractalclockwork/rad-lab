@@ -6,6 +6,15 @@ usb_vendor: "0456"
 usb_product: "b673"
 soapy_driver: plutosdr
 device_name: ADALM-PLUTO
+firmware_target: "v0.39"
+firmware_release_id: plutosdr-fw-v0.39
+firmware_bin: pluto.frm
+firmware_dfu: pluto.dfu
+firmware_bin_path: archive/cache/sdk/plutosdr-fw-v0.39/pluto.frm
+firmware_dfu_path: archive/cache/sdk/plutosdr-fw-v0.39/pluto.dfu
+# Known DUT serial from lab bring-up (override with PLUTO_SERIAL).
+expected_serial: "1044734c96050013eaff200049464f471d"
+# ISM test tone for attenuated cable loopback only. Do not radiate from an antenna.
 center_hz: 915000000
 sample_rate: 2000000
 tone_offset_hz: 100000

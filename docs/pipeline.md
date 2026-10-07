@@ -30,6 +30,7 @@ flowchart LR
 | `make stage BOARD=<id> STAGE=<name>` | One of `present`, `workflow`, `image` |
 | `make hil BOARD=<id>` | The `image` stage |
 | `make firmware BOARD=hackrf` | SPI-flash / verify firmware (`HIL_FIRMWARE=1` to write) |
+| `make firmware BOARD=pluto` | Mass-storage / verify Pluto firmware (`HIL_FIRMWARE=1` to write) |
 | `make check` | pytest, then `make sim` for `hackrf` |
 
 `BOARD` defaults to `hackrf`. `STAGE` defaults to `present`.
@@ -58,13 +59,14 @@ Board order is fixed: `hackrf`, then `pluto`. Any stage on a later board is refu
 | Variable | When |
 | --- | --- |
 | `HIL_LOOPBACK` | Must be `1` before `image`. Operator asserts attenuator/cable TX→RX |
-| `HIL_FIRMWARE` | Must be `1` before SPI flash. Operator asserts the correct HackRF is on USB |
+| `HIL_FIRMWARE` | Must be `1` before firmware write. Operator asserts the correct HackRF or Pluto is on USB |
 | `HACKRF_SERIAL` | Optional override of `expected_serial` in `boards/hackrf.yaml` |
+| `PLUTO_SERIAL` | Optional override of `expected_serial` in `boards/pluto.yaml` |
 | `RAD_LAB_HIL_SIM` | Set to `1` for software-only image stage (tests / no hardware) |
 
 ## Container
 
-`docker/sdr/Dockerfile` is Ubuntu 24.04 with HackRF tools, SoapySDR HackRF module, `libiio-utils`, and Python numpy/scipy. There is no packaged Soapy Pluto module on this base; Pluto HIL can use host IIO until a later image layer adds it. GNU Radio is omitted from the slim image.
+`docker/sdr/Dockerfile` is Ubuntu 24.04 with HackRF tools (release **2026.01.3**), SoapySDR HackRF module, **SoapyPlutoSDR** (built from source), `libiio-utils` / `python3-libiio`, `dfu-util`, and Python numpy/scipy. GNU Radio is omitted from the slim image.
 
 Example USB helper (when host tools are absent):
 

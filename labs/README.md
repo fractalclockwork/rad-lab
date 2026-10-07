@@ -8,6 +8,7 @@ Hands-on exercises for the containerized SDR environment. Run after HackRF `pres
 | Soapy probe | [02_soapy_probe.py](02_soapy_probe.py) | HackRF preferred |
 | RX capture | [03_rx_capture.py](03_rx_capture.py) | HackRF |
 | TX callsign FM | [04_tx_callsign_fm.py](04_tx_callsign_fm.py) | HackRF (+ licensed op) |
+| Pluto 2 m RX | [05_pluto_rx_capture.py](05_pluto_rx_capture.py) | Pluto (+ Baofeng known TX) |
 
 ## Callsign
 

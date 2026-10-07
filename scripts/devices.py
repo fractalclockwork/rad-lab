@@ -129,21 +129,68 @@ def probe_soapy(driver="hackrf"):
     if code != 0:
         return ProbeResult(ok=False, tool="SoapySDRUtil", detail=text[-500:], raw=text)
     serial = ""
-    match = re.search(r"serial\s*[:=]\s*([^\s,]+)", text, re.IGNORECASE)
+    match = re.search(r"hw_serial\s*[:=]\s*([^\s,]+)", text, re.IGNORECASE)
     if match:
         serial = match.group(1)
+    else:
+        match = re.search(r"(?<![_\w])serial\s*[:=]\s*([^\s,]+)", text, re.IGNORECASE)
+        if match:
+            serial = match.group(1)
+    name = driver
+    fw_match = re.search(r"fw_version\s*[:=]\s*([^\s,]+)", text, re.IGNORECASE)
+    if fw_match:
+        name = f"{driver} {fw_match.group(1)}"
     return ProbeResult(
         ok=True,
         tool="SoapySDRUtil",
-        device_name=driver,
+        device_name=name,
         serial=serial,
         detail="soapy probe ok",
         raw=text,
     )
 
 
+def probe_iio_pluto():
+    """Probe ADALM-PLUTO via libiio (`iio_info -s` + context attrs)."""
+    code, text = run_text(["iio_info", "-s"], usb=True)
+    uri = ""
+    for line in text.splitlines():
+        match = re.search(r"\b((?:usb|ip|local):[^\s,]+)", line)
+        if match and (
+            "pluto" in line.lower()
+            or "0456" in line.lower()
+            or "ad936" in line.lower()
+            or "analog devices" in line.lower()
+        ):
+            uri = match.group(1)
+            break
+    if not uri and code == 0:
+        match = re.search(r"\b((?:usb|ip|local):[^\s,]+)", text)
+        if match:
+            uri = match.group(1)
+    if not uri:
+        return ProbeResult(ok=False, tool="iio_info", detail="no Pluto IIO context", raw=text)
+
+    fw = ""
+    serial = ""
+    code_a, fw_text = run_text(["iio_attr", "-u", uri, "-C", "fw_version"], usb=True)
+    if code_a == 0 and fw_text.strip():
+        fw = fw_text.strip().split(":")[-1].strip()
+    code_s, ser_text = run_text(["iio_attr", "-u", uri, "-C", "hw_serial"], usb=True)
+    if code_s == 0 and ser_text.strip():
+        serial = ser_text.strip().split(":")[-1].strip()
+    return ProbeResult(
+        ok=True,
+        tool="iio_info",
+        device_name=f"ADALM-PLUTO {fw}".strip(),
+        serial=serial,
+        detail=f"uri={uri} fw={fw or '?'}",
+        raw=text + "\n" + fw_text + "\n" + ser_text,
+    )
+
+
 def probe_board(board):
-    """Prefer hackrf_info for HackRF; fall back to Soapy; always record lsusb."""
+    """Prefer hackrf_info for HackRF; IIO then Soapy for Pluto; always record lsusb."""
     vendor = str(board.get("usb_vendor", "")).lower()
     product = str(board.get("usb_product", "")).lower()
     matches = usb_matches(vendor, product) if vendor and product else []
@@ -152,6 +199,11 @@ def probe_board(board):
         result = probe_hackrf_info()
         if not result.ok:
             result = probe_soapy(board.get("soapy_driver") or "hackrf")
+    elif board_id == "pluto":
+        # Soapy first: more reliable than iio_info -s when Avahi/scan is busy.
+        result = probe_soapy(board.get("soapy_driver") or "plutosdr")
+        if not result.ok:
+            result = probe_iio_pluto()
     else:
         result = probe_soapy(board.get("soapy_driver") or board_id)
     result.usb_matches = matches

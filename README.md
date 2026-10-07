@@ -50,11 +50,10 @@ make archive
 make image          # builds rad-lab-sdr (HackRF tools 2026.01.3)
 make check          # pytest + software fixture
 
-# Firmware (SPI) — operator must confirm the DUT first:
+# Firmware — operator must confirm the DUT first:
 export HIL_FIRMWARE=1
-make firmware BOARD=hackrf
-# RESET the HackRF, then verify:
-make firmware BOARD=hackrf
+make firmware BOARD=hackrf   # SPI; then RESET and re-run to verify
+make firmware BOARD=pluto    # mass-storage pluto.frm → v0.39 (after HackRF image)
 
 # With HackRF on USB and attenuator path wired:
 export HIL_LOOPBACK=1

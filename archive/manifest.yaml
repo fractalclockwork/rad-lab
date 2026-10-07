@@ -51,3 +51,13 @@ items:
     extract: true
     extract_dir: archive/cache/sdk/hackrf-2026.01.3
     extract_marker: archive/cache/sdk/hackrf-2026.01.3/firmware-bin/hackrf_one_usb.bin
+  - id: plutosdr-fw-v0.39
+    kind: sdk
+    board: pluto
+    url: https://github.com/analogdevicesinc/plutosdr-fw/releases/download/v0.39/plutosdr-fw-v0.39.zip
+    path: archive/cache/sdk/plutosdr-fw-v0.39.zip
+    sha256: 6542a4a9aafe7d51239dc896b93e1c56c301fab526e8a78472f7f13b6f27dfec
+    license: gpl-2.0
+    extract: true
+    extract_dir: archive/cache/sdk/plutosdr-fw-v0.39
+    extract_marker: archive/cache/sdk/plutosdr-fw-v0.39/pluto.frm

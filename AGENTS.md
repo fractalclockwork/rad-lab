@@ -10,12 +10,13 @@ This repository uses a **host-gated, staged** bring-up. Agents must treat `repor
 4. Run `make hil` / `STAGE=image` **only** when `HIL_LOOPBACK=1` is set and the operator has confirmed an attenuator cable from TX to RX.
 5. Use `RAD_LAB_HIL_SIM=1` for image-stage dry runs in CI or when no RF hardware is present (still requires `HIL_LOOPBACK=1`).
 6. Run `make firmware BOARD=hackrf` **only** when `HIL_FIRMWARE=1` is set and the operator has confirmed the correct HackRF One is on USB.
+7. Run `make firmware BOARD=pluto` **only** when `HIL_FIRMWARE=1` is set and the operator has confirmed the correct ADALM-PLUTO is on USB (mass-storage `pluto.frm`; DFU only after that fails).
 
 ## Forbidden
 
 - Setting `HIL_LOOPBACK=1` without an attenuator/cable path (do not invent operator assent).
 - Setting `HIL_FIRMWARE=1` without operator confirmation of the DUT identity.
-- Entering DFU or running `dfu-util` unless `hackrf_spiflash` has already failed.
+- Entering DFU or running `dfu-util` unless `hackrf_spiflash` (HackRF) or Pluto mass-storage flash has already failed.
 - Raising `txvga_db` above `max_tx_db` in board YAML for a “stronger” signal.
 - Antenna TX, outdoor TX, or amplifier-enabled TX from default stages.
 - Skipping stage order (`present` → `workflow` → `image`) or running Pluto before HackRF `image` passes.
@@ -39,8 +40,14 @@ make stage BOARD=hackrf STAGE=present
 make stage BOARD=hackrf STAGE=workflow
 HIL_LOOPBACK=1 RAD_LAB_HIL_SIM=1 make hil BOARD=hackrf   # no RF
 HIL_LOOPBACK=1 make hil BOARD=hackrf                     # real loopback
+# Pluto (after HackRF image pass):
+make firmware BOARD=pluto                                # record / verify v0.39
+HIL_FIRMWARE=1 make firmware BOARD=pluto                 # mass-storage pluto.frm
+make stage BOARD=pluto STAGE=present
+make stage BOARD=pluto STAGE=workflow
+HIL_LOOPBACK=1 make hil BOARD=pluto                      # attenuated TX↔RX
 ```
 
 ## Container
 
-`make image` builds `rad-lab-sdr` with HackRF host tools from release **2026.01.3**. Prefer those tools for firmware work. Mount USB with `--privileged -v /dev/bus/usb:/dev/bus/usb` when probing or flashing from the container.
+`make image` builds `rad-lab-sdr` with HackRF host tools from release **2026.01.3**, libiio utils, and SoapyPlutoSDR. Prefer those tools for firmware work. Mount USB with `--privileged -v /dev/bus/usb:/dev/bus/usb` when probing or flashing from the container.

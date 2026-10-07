@@ -23,7 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-soapysdr \
         soapysdr-tools \
         soapysdr-module-hackrf \
+        libsoapysdr-dev \
+        libiio-dev \
         libiio-utils \
+        libad9361-0 \
+        python3-libiio \
+        git \
         usbutils \
         dfu-util \
     && rm -rf /var/lib/apt/lists/*
@@ -41,8 +46,19 @@ RUN mkdir -p /tmp/hackrf-src \
     && rm -rf /tmp/hackrf.tar.xz /tmp/hackrf-src /tmp/hackrf-build \
     && hackrf_info 2>&1 | head -5 || true
 
+# SoapyPlutoSDR (not packaged on Ubuntu 24.04) for Pluto HIL / RX labs.
+RUN git clone --depth 1 https://github.com/pothosware/SoapyPlutoSDR.git /tmp/SoapyPlutoSDR \
+    && cmake -S /tmp/SoapyPlutoSDR -B /tmp/SoapyPlutoSDR-build \
+        -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build /tmp/SoapyPlutoSDR-build -j"$(nproc)" \
+    && cmake --install /tmp/SoapyPlutoSDR-build \
+    && ldconfig \
+    && rm -rf /tmp/SoapyPlutoSDR /tmp/SoapyPlutoSDR-build \
+    && SoapySDRUtil --info 2>&1 | head -20 || true
+
 # Firmware images live on the mounted repo at runtime:
 # archive/cache/sdk/hackrf-2026.01.3/firmware-bin/hackrf_one_usb.bin
+# archive/cache/sdk/plutosdr-fw-v0.39/pluto.frm
 
 WORKDIR /work
 COPY docker/sdr/entrypoint.sh /usr/local/bin/rad-lab-entrypoint
