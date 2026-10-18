@@ -7,7 +7,7 @@ PYTHON := .venv/bin/python
 endif
 
 IMAGE ?= rad-lab-sdr
-export PYTHONPATH := $(CURDIR)/scripts:$(PYTHONPATH)
+export PYTHONPATH := $(CURDIR)/hil/scripts:$(PYTHONPATH)
 
 .PHONY: archive archive-image image stage sim hil firmware check venv
 
@@ -17,16 +17,16 @@ venv:
 	.venv/bin/pip install -r requirements.txt
 
 archive:
-	$(PYTHON) scripts/archive.py
+	$(PYTHON) hil/scripts/archive.py
 
 image: archive
 	docker build -t $(IMAGE) -f docker/sdr/Dockerfile .
 
 archive-image: image
-	$(PYTHON) scripts/archive.py --save-image
+	$(PYTHON) hil/scripts/archive.py --save-image
 
 stage:
-	$(PYTHON) scripts/stage.py --board $(BOARD) --stage $(STAGE)
+	$(PYTHON) hil/scripts/stage.py --board $(BOARD) --stage $(STAGE)
 
 sim:
 	RAD_LAB_HIL_SIM=1 $(PYTHON) -c "from radboards import load_board; from fixture import run_fixture; print(run_fixture(load_board('$(BOARD)')))"
@@ -35,10 +35,10 @@ build:
 	@echo "SDR boards have no bitstream build; use make hil after present/workflow."
 
 hil:
-	$(PYTHON) scripts/stage.py --board $(BOARD) --stage image
+	$(PYTHON) hil/scripts/stage.py --board $(BOARD) --stage image
 
 firmware:
-	$(PYTHON) scripts/firmware.py --board $(BOARD)
+	$(PYTHON) hil/scripts/firmware.py --board $(BOARD)
 
 check:
 	$(PYTHON) -m pytest -q

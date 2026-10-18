@@ -20,7 +20,7 @@ jobs:
         run: make check
       - name: Simulated image stage
         env:
-          PYTHONPATH: scripts
+          PYTHONPATH: hil/scripts
         run: |
           # Exercise gates + simulated HIL without USB hardware.
           python - <<'PY'
