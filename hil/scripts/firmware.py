@@ -171,11 +171,17 @@ def iio_attr_context(uri, attr):
 
 def probe_pluto_soapy():
     """Fallback when `iio_info -s` fails (Avahi / device busy): Soapy probe text."""
-    # Hard-wrap with timeout(1) so a stuck libiio scan cannot hang the agent.
+    # Do NOT wrap with the host `timeout` binary. run_text() decides whether to
+    # run in the rad-lab-sdr container by checking shutil.which(argv[0]); a host
+    # `timeout` would match and skip the container, so SoapySDRUtil would never
+    # run in the image (it is absent on the host). run_text already enforces its
+    # own subprocess timeout, so a stuck libiio scan still cannot hang the agent.
+
     def _soapy(argv):
-        if shutil.which("timeout"):
-            argv = ["timeout", "25"] + argv
-        return run_text(argv, usb=True, timeout=30)
+        try:
+            return run_text(argv, usb=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            return 124, "timeout"
 
     code, text = _soapy(["SoapySDRUtil", "--probe=driver=plutosdr"])
     if code != 0 or (

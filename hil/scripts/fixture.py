@@ -40,7 +40,16 @@ def measure_tone_snr(iq, sample_rate, tone_offset_hz, bin_half_width_hz=None):
     tone_power = float(np.max(power[tone_mask]))
     noise_power = float(np.median(power[noise_mask])) if np.any(noise_mask) else 1e-20
     snr_db = 10.0 * np.log10(tone_power / max(noise_power, 1e-20))
-    peak_hz = float(freqs[np.argmax(power)])
+    # Peak search over non-DC bins. Quadrature receivers (e.g. HackRF) inject a
+    # DC/LO-leakage spike that is a measurement artifact, not a received signal;
+    # including it would pin the global argmax to 0 Hz. This mirrors the DC guard
+    # already applied to the noise estimate, so a genuinely absent or mis-tuned
+    # tone still yields a peak elsewhere and fails assert_tone_peak.
+    dc_free = np.abs(freqs) > sample_rate / n * 2
+    if np.any(dc_free):
+        peak_hz = float(freqs[dc_free][np.argmax(power[dc_free])])
+    else:
+        peak_hz = float(freqs[np.argmax(power)])
     return {
         "snr_db": float(snr_db),
         "peak_hz": peak_hz,
