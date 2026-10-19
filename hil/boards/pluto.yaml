@@ -20,7 +20,7 @@ sample_rate: 2000000
 tone_offset_hz: 100000
 rx_lna_db: 30
 rx_vga_db: 0
-txvga_db: -10
+txvga_db: -30
 max_tx_db: -5
 max_tx_ms: 200
 rx_ms: 400
