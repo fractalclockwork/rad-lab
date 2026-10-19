@@ -2,14 +2,35 @@
 
 from __future__ import annotations
 
+import os
 import re
-import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 HACKRF_USB = ("1d50", "6089")
 PLUTO_USB = ("0456", "b673")
+
+# SDR toolchain binaries that MUST run inside the rad-lab-sdr image so the
+# dev-host never directly exercises RF hardware. Anything disallowed here is a
+# host-side utility (e.g. lsusb) or a container build/manifest step.
+SDR_BINARIES = {
+    "hackrf_info",
+    "hackrf_spiflash",
+    "hackrf_transfer",
+    "SoapySDRUtil",
+    "iio_info",
+    "iio_attr",
+    "dfu-util",
+}
+
+
+def is_sdr_binary(name):
+    if name in ("lsusb",):
+        return False  # informational USB enumeration only; host-side, no RF touched
+    return name in SDR_BINARIES
 
 
 @dataclass
@@ -35,31 +56,34 @@ def docker_image_exists():
     return completed.returncode == 0
 
 
-def docker_prefix(usb=False):
-    prefix = ["docker", "run", "--rm"]
+def docker_prefix(usb=False, mounts=(), workdir=None):
+    prefix = ["docker", "run", "--rm", "-e", "RAD_LAB_CONTAINER=1"]
     if usb:
         prefix.extend(["--privileged", "-v", "/dev/bus/usb:/dev/bus/usb"])
+    for mount in mounts:
+        prefix.extend(["-v", mount])
+    if workdir:
+        prefix.extend(["-w", workdir])
     prefix.append(IMAGE_NAME)
     return prefix
 
 
 def run_text(argv, timeout=30, usb=False):
-    """Run argv on the host, or inside rad-lab-sdr when the binary is missing."""
-    if shutil.which(argv[0]) is None:
-        if docker_image_exists():
-            argv = docker_prefix(usb=usb) + list(argv)
-        else:
-            return (
-                127,
-                f"{argv[0]} not on PATH and {IMAGE_NAME} image is not built "
-                "(run make image)",
-            )
-    completed = subprocess.run(
-        argv,
-        text=True,
-        capture_output=True,
-        timeout=timeout,
-    )
+    """Run SDR tooling ONLY inside the rad-lab-sdr container.
+
+    Returns ``(returncode, combined_output)``. SDR runtime (hackrf_info/
+    hackrf_spiflash/hackrf_transfer/SoapySDRUtil/iio_info/iio_attr/dfu-util) is
+    never executed on the dev-host. The dev-host remains the control plane for
+    orchestration plus informational, non-RF utilities: `lsusb` (kernel USB
+    enumeration only) and report-file writing.
+    """
+    argv = list(argv)
+    if is_sdr_binary(argv[0]):
+        # Unconditionally containerized: the dev-host never executes SDR
+        # toolchain binaries, even when they exist on the host PATH.
+        argv = docker_prefix(usb=usb) + argv
+    # Host-side utility (e.g. lsusb): informational, no RF.
+    completed = subprocess.run(argv, text=True, capture_output=True, timeout=timeout)
     return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
 
 
@@ -217,16 +241,96 @@ def probe_board(board):
     return result
 
 
-def open_soapy_device(driver):
-    """Return (device, None) or (None, error). Soft dependency on SoapySDR Python."""
-    try:
-        import SoapySDR  # type: ignore
-    except ImportError as exc:
-        return None, f"SoapySDR Python bindings unavailable: {exc}"
-    try:
-        devices = SoapySDR.Device.enumerate(dict(driver=driver))
-        if not devices:
-            return None, f"no Soapy devices for driver={driver}"
-        return SoapySDR.Device(devices[0]), None
-    except Exception as exc:  # noqa: BLE001 — surface to stage record
-        return None, str(exc)
+def in_container():
+    """True when running inside rad-lab-sdr (env marker or Docker/Podman sentinel)."""
+    if os.environ.get("RAD_LAB_CONTAINER") == "1":
+        return True
+    return Path("/.dockerenv").exists() or Path("/.containerenv").exists()
+
+
+def require_container(tool):
+    """Refuse host-side SDR software execution; all SDR runs go through rad-lab-sdr."""
+    if in_container():
+        return
+    raise SystemExit(
+        f"{tool} must run inside the rad-lab-sdr container, never on the dev-host. "
+        'Use: make sdr SRC="python3 hil/labs/<lab>.py" '
+        "or: python3 hil/scripts/sdr_run.py <binary|script>"
+    )
+
+
+def hardware_present(board):
+    """True when the board's VID:PID shows up on the host USB bus (lsusb only)."""
+    vendor = str(board.get("usb_vendor", "")).lower()
+    product = str(board.get("usb_product", "")).lower()
+    if not vendor or not product:
+        return False
+    return bool(usb_matches(vendor, product))
+
+
+def require_hardware(board):
+    """Refuse to proceed when the board is not visible on USB.
+
+    Host-side lsusb only — no docker, no RF touched. Print the VID:PID we looked
+    for, what lsusb actually saw, and the software-only escape hatch so the
+    operator can recover without guessing.
+    """
+    vendor = str(board.get("usb_vendor", "")).lower()
+    product = str(board.get("usb_product", "")).lower()
+    board_id = board.get("id", board)
+    seen = lsusb_text()
+    matches = usb_matches(vendor, product, seen) if vendor and product else []
+    if matches:
+        return
+    lines = [
+        f"{board_id}: device not present on USB (looking for {vendor}:{product})",
+        "    refused to proceed — no SDR hardware detected.",
+    ]
+    if seen.strip():
+        lines.append("    lsusb output:")
+        for line in seen.strip().splitlines():
+            lines.append(f"        {line}")
+    else:
+        lines.append("    lsusb returned nothing (or is unavailable).")
+    lines.extend(
+        [
+            "    Software-only escape hatch:",
+            "        RAD_LAB_HIL_SIM=1 HIL_LOOPBACK=1 make hil BOARD=" + str(board_id),
+            "        make sim BOARD=" + str(board_id),
+        ]
+    )
+    raise SystemExit("\n".join(lines))
+
+
+TX_CONFIRM_ENV = "HIL_TX_CONFIRM"
+
+
+def confirm_tx(reason):
+    """Require explicit operator confirmation before any TX.
+
+    Order of precedence:
+      1. HIL_TX_CONFIRM=1   — scripted/CI escape hatch; documents human assent.
+      2. TTY present        — interactive YES prompt.
+      3. Otherwise          — refuse. Fail closed so agents/CI cannot invent assent.
+    """
+    if os.environ.get(TX_CONFIRM_ENV) == "1":
+        return
+    if sys.stdin.isatty():
+        prompt = (
+            f"TX about to start: {reason}\n"
+            "Confirm an attenuator or antenna is connected (TX will radiate or drive "
+            "a conducted cable). Type YES to proceed: "
+        )
+        try:
+            answer = input(prompt)
+        except (EOFError, KeyboardInterrupt):
+            print("\nTX aborted.", file=sys.stderr)
+            raise SystemExit(1)
+        if answer.strip() != "YES":
+            print("TX aborted (confirmation not 'YES').", file=sys.stderr)
+            raise SystemExit(1)
+        return
+    raise SystemExit(
+        f"refusing TX ({reason}): no TTY and {TX_CONFIRM_ENV} not set. "
+        f"Set {TX_CONFIRM_ENV}=1 (scripted) or run interactively to confirm TX."
+    )

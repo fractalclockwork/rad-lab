@@ -18,7 +18,10 @@ from pathlib import Path
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "hil" / "scripts"))
 ROOT = REPO_ROOT
+from devices import confirm_tx  # noqa: E402
+
 CALLSIGN_ENV = "RAD_LAB_CALLSIGN"
 
 MORSE = {
@@ -203,11 +206,18 @@ def main():
         report_path.write_text(json.dumps({**meta, "status": "dry_run"}, indent=2) + "\n")
         return 0
 
+    confirm_tx(
+        "HackRF FM Morse ID burst "
+        "(attach an antenna for radiated TX, or an attenuator for a conducted path)"
+    )
+
     cmd = [
         "docker",
         "run",
         "--rm",
         "--privileged",
+        "-e",
+        "RAD_LAB_CONTAINER=1",
         "-v",
         "/dev/bus/usb:/dev/bus/usb",
         "-v",

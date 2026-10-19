@@ -9,7 +9,7 @@ endif
 IMAGE ?= rad-lab-sdr
 export PYTHONPATH := $(CURDIR)/hil/scripts:$(PYTHONPATH)
 
-.PHONY: archive archive-image image stage sim hil firmware check venv
+.PHONY: archive archive-image image stage sim hil firmware check venv sdr
 
 venv:
 	$(PYTHON) -m venv .venv
@@ -24,6 +24,13 @@ image: archive
 
 archive-image: image
 	$(PYTHON) hil/scripts/archive.py --save-image
+
+# Container-only SDR dev-run. Every SDR binary (hackrf_info / hackrf_transfer /
+# SoapySDRUtil / iio_info / dfu-util, plus the bring-up labs) executes inside
+# rad-lab-sdr; the dev-host never exercises RF hardware. `lsusb` and report-file
+# writes remain host-side informational operations.
+sdr:
+	$(PYTHON) hil/scripts/sdr_run.py $(SRC) $(ARGS)
 
 stage:
 	$(PYTHON) hil/scripts/stage.py --board $(BOARD) --stage $(STAGE)

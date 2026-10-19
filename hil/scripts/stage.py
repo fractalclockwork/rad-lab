@@ -20,7 +20,7 @@ from radboards import (
     stage_passed,
     write_stage,
 )
-from devices import probe_board, open_soapy_device
+from devices import confirm_tx, probe_board, probe_soapy, require_hardware
 from fixture import run_fixture
 from hil import run_loopback_hil, write_hil_logs
 
@@ -108,6 +108,8 @@ def run_present(board):
 
 
 def run_workflow(board):
+    # Hardware must be present before any container-side device open/Probe.
+    require_hardware(board)
     present = read_stages(board["id"])["stages"].get("present") or {}
     env_name = board.get("requires_env")
     loopback = {
@@ -121,16 +123,17 @@ def run_workflow(board):
         "center_hz": board.get("center_hz"),
     }
     driver = board.get("soapy_driver") or board["id"]
-    device, error = open_soapy_device(driver)
-    if error:
-        # Host may only have CLI tools; re-probe is enough for workflow if present passed.
+    # Device-open evidence comes from a container-side Soapy probe (the dev-host
+    # never imports SoapySDR). Fall back to the CLI re-probe if it fails.
+    probe = probe_soapy(driver)
+    if not probe.ok:
         result = probe_board(board)
         if not result.ok:
             return fail_record(
                 board,
                 "workflow",
-                error,
-                tool="SoapySDR",
+                probe.detail or "soapy probe failed",
+                tool="SoapySDRUtil",
                 probe=result.detail,
             )
         return pass_record(
@@ -140,22 +143,17 @@ def run_workflow(board):
             device=present.get("device") or result.device_name,
             serial=present.get("serial") or result.serial,
             soapy_open="skipped",
-            soapy_note=error,
+            soapy_note=probe.detail,
             loopback=loopback,
             tx_limits=limits,
             image_paths={primary_image_path(board)["id"]: "ready"},
         )
-    # Soft close — Soapy devices do not always expose close().
-    try:
-        del device
-    except Exception:
-        pass
     return pass_record(
         board,
         "workflow",
-        tool="SoapySDR",
-        device=present.get("device") or board.get("device_name"),
-        serial=present.get("serial"),
+        tool="SoapySDRUtil",
+        device=present.get("device") or probe.device_name or board.get("device_name"),
+        serial=present.get("serial") or probe.serial,
         soapy_open="ok",
         loopback=loopback,
         tx_limits=limits,
@@ -165,6 +163,8 @@ def run_workflow(board):
 
 def run_image(board):
     out = run_dir(board["id"])
+    # Hardware presence is a hard preflight for every image stage (sim or real).
+    require_hardware(board)
     try:
         fixture = run_fixture(board, out_dir=out)
     except Exception as exc:
@@ -173,6 +173,13 @@ def run_image(board):
 
     simulate = os.environ.get("RAD_LAB_HIL_SIM") == "1"
     try:
+        # Real RF TX/RX must run inside the container so SoapySDR opens the
+        # board through the SDR toolchain image (never on the dev-host).
+        if not simulate:
+            confirm_tx(
+                f"attenuated TX→RX loopback on {board['id']} "
+                "(conducted cable only; no antenna)"
+            )
         records = run_loopback_hil(board, simulate=simulate)
     except Exception as exc:
         write_hil_logs(out, [], failures=[str(exc)])

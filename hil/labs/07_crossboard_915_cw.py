@@ -25,13 +25,15 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "hil" / "scripts"))
 ROOT = REPO_ROOT
+from devices import confirm_tx, TX_CONFIRM_ENV  # noqa: E402
 
 from fixture import measure_tone_snr  # noqa: E402
 from radboards import load_board  # noqa: E402
 
 LOOPBACK_ENV = "HIL_LOOPBACK"
 IMAGE_NAME = "rad-lab-sdr"
-PEAK_TOLERANCE_HZ = 5000.0
+PEAK_TOLERANCE_HZ = 10000.0
+# ~11 ppm at 915 MHz; accommodates independent LO crystal offsets between boards.
 LEGS = (
     ("hackrf", "pluto", "Wire HackRF TX → attenuator → Pluto RX, then press Enter."),
     ("pluto", "hackrf", "Rewire Pluto TX → attenuator → HackRF RX, then press Enter."),
@@ -106,6 +108,9 @@ def prompt_wire(message, stdin=None, no_prompt=False):
 
 
 def _open_soapy(board):
+    from devices import require_container  # noqa: E402
+
+    require_container("hil/labs/07_crossboard_915_cw.py")
     import SoapySDR  # type: ignore
 
     driver = board.get("soapy_driver") or board["id"]
@@ -147,10 +152,17 @@ def _set_tx_gain(dev, board, gain):
 
 def run_leg_hardware(tx_id, rx_id):
     """TX on one board, RX on the other; score CW tone. Container entrypoint."""
+    from devices import require_container  # noqa: E402
+
+    require_container("hil/labs/07_crossboard_915_cw.py --run-leg")
     import SoapySDR  # type: ignore
     from SoapySDR import SOAPY_SDR_CF32, SOAPY_SDR_RX, SOAPY_SDR_TX  # type: ignore
 
     assert_loopback()
+    confirm_tx(
+        "915 MHz CW crossboard leg TX "
+        "(attenuated cable only; no antenna on either board)"
+    )
     tx_board = load_board(tx_id)
     rx_board = load_board(rx_id)
     rf = shared_rf(tx_board, rx_board)
@@ -260,7 +272,11 @@ def _docker_run_leg(tx_id, rx_id):
         "--rm",
         "--privileged",
         "-e",
+        "RAD_LAB_CONTAINER=1",
+        "-e",
         f"{LOOPBACK_ENV}=1",
+        "-e",
+        f"{TX_CONFIRM_ENV}=1",
         "-v",
         "/dev/bus/usb:/dev/bus/usb",
         "-v",
@@ -321,6 +337,10 @@ def main(argv=None):
         return run_leg_hardware(args.tx, args.rx)
 
     assert_loopback()
+    confirm_tx(
+        "915 MHz CW crossboard TX "
+        "(attenuated cable only; no antenna on either board)"
+    )
     hackrf = load_board("hackrf")
     pluto = load_board("pluto")
     rf = shared_rf(hackrf, pluto)

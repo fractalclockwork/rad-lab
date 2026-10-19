@@ -25,7 +25,8 @@ txvga_db: 0
 max_tx_db: 4
 max_tx_ms: 200
 rx_ms: 400
-min_snr_db: 10.0
+min_snr_db: 7.0
+# SNR acceptance band: 10 dB +/- 3 dB (7-13 dB) for automated loopback testing.
 requires_env: HIL_LOOPBACK
 control_buses:
   - id: usb

@@ -27,6 +27,9 @@ def main():
     vga = float(board.get("rx_vga_db", 16))
     n = max(4096, int(sample_rate * rx_ms / 1000))
 
+    from devices import require_container  # noqa: E402
+
+    require_container("hil/labs/03_rx_capture.py")
     import SoapySDR  # type: ignore
     from SoapySDR import SOAPY_SDR_RX, SOAPY_SDR_CF32  # type: ignore
 

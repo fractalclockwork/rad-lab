@@ -46,7 +46,13 @@ def measure_tone_snr(iq, sample_rate, tone_offset_hz, bin_half_width_hz=None):
     # already applied to the noise estimate, so a genuinely absent or mis-tuned
     # tone still yields a peak elsewhere and fails assert_tone_peak.
     dc_free = np.abs(freqs) > sample_rate / n * 2
-    if np.any(dc_free):
+    # Exclude band edges where LO leakage / DC-offset images can dominate the
+    # argmax on weak loopback signals (direct-conversion receivers inject
+    # artifacts near +/- Nyquist that are not the tone under test).
+    edge_free = dc_free & (np.abs(freqs) < sample_rate / 2.0 - sample_rate / n * 10)
+    if np.any(edge_free):
+        peak_hz = float(freqs[edge_free][np.argmax(power[edge_free])])
+    elif np.any(dc_free):
         peak_hz = float(freqs[dc_free][np.argmax(power[dc_free])])
     else:
         peak_hz = float(freqs[np.argmax(power)])

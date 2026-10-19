@@ -27,6 +27,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "hil" / "scripts"))
 ROOT = REPO_ROOT
+from devices import confirm_tx  # noqa: E402
 
 from radboards import load_board  # noqa: E402
 
@@ -92,10 +93,18 @@ def build_iq(callsign: str, sample_rate: int, deviation_hz: float, repeat: int, 
 
 def stream_file(path: Path, freq: int, sample_rate: int, gain_db: float):
     """Transmit one CF32 file on Pluto TX. Used inside rad-lab-sdr."""
+    from devices import confirm_tx, require_container  # noqa: E402
+
+    require_container("hil/labs/06_pluto_tx_callsign_fm.py")
     import SoapySDR  # type: ignore
     from SoapySDR import SOAPY_SDR_CF32, SOAPY_SDR_TX  # type: ignore
 
     assert_loopback()
+    confirm_tx(
+        "Pluto FM TX "
+        "(conducted path only: attenuator or 50 Ω load; no antenna)"
+    )
+    assert_frequency(freq)
     assert_frequency(freq)
     board = load_board("pluto")
     gain_db = assert_tx_gain(gain_db, float(board["max_tx_db"]))
@@ -158,6 +167,8 @@ def _docker_stream(iq_path: Path, freq: int, sample_rate: int, gain_db: float):
         "run",
         "--rm",
         "--privileged",
+        "-e",
+        "RAD_LAB_CONTAINER=1",
         "-e",
         f"{LOOPBACK_ENV}=1",
         "-v",
@@ -256,6 +267,10 @@ def main(argv=None):
         return 0
 
     assert_loopback()
+    confirm_tx(
+        "Pluto FM Morse ID burst "
+        "(conducted path only: attenuator or 50 Ω load; no antenna)"
+    )
     print(
         f"TX {callsign} on {args.freq / 1e6:.3f} MHz for ~{dur_s:.1f}s "
         f"(gain={gain} dB, deviation={args.deviation} Hz).",

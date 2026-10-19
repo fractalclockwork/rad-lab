@@ -173,6 +173,9 @@ def main(argv=None):
     min_carrier_db = float(args.min_carrier_db)
     n = max(4096, int(sample_rate * rx_ms / 1000))
 
+    from devices import require_container  # noqa: E402
+
+    require_container("hil/labs/05_pluto_rx_capture.py")
     import SoapySDR  # type: ignore
     from SoapySDR import SOAPY_SDR_RX, SOAPY_SDR_CF32  # type: ignore
 

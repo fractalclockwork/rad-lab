@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from devices import IMAGE_NAME, docker_image_exists, parse_hackrf_info, run_text
+from devices import IMAGE_NAME, docker_image_exists, parse_hackrf_info, require_hardware, run_text
 from radboards import ROOT, load_board
 
 FIRMWARE_ENV = "HIL_FIRMWARE"
@@ -104,7 +104,7 @@ def probe_hackrf():
         "firmware": version,
         "uri": "",
         "raw": text,
-        "tool_host": shutil.which("hackrf_info") or f"docker:{IMAGE_NAME}",
+        "tool_host": f"docker:{IMAGE_NAME}",  # SDR toolchain runs only in the container
     }
 
 
@@ -113,28 +113,27 @@ def expected_serial_hackrf(board):
 
 
 def run_spiflash(bin_path):
-    argv = ["hackrf_spiflash", "-w", str(bin_path)]
-    if shutil.which("hackrf_spiflash") is None:
-        if not docker_image_exists():
-            raise SystemExit(
-                f"hackrf_spiflash not on PATH and {IMAGE_NAME} missing; run make image"
-            )
-        argv = (
-            [
-                "docker",
-                "run",
-                "--rm",
-                "--privileged",
-                "-v",
-                "/dev/bus/usb:/dev/bus/usb",
-                "-v",
-                f"{ROOT}:{ROOT}",
-                "-w",
-                str(ROOT),
-                IMAGE_NAME,
-            ]
-            + argv
-        )
+    """SPI-flash HackRF firmware — always inside rad-lab-sdr (never host-side)."""
+    if not docker_image_exists():
+        raise SystemExit(f"{IMAGE_NAME} image missing; run make image")
+    argv = (
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-e",
+            "RAD_LAB_CONTAINER=1",
+            "--privileged",
+            "-v",
+            "/dev/bus/usb:/dev/bus/usb",
+            "-v",
+            f"{ROOT}:{ROOT}",
+            "-w",
+            str(ROOT),
+            IMAGE_NAME,
+        ]
+        + ["hackrf_spiflash", "-w", str(bin_path)]
+    )
     completed = subprocess.run(argv, text=True, capture_output=True)
     output = (completed.stdout or "") + (completed.stderr or "")
     return completed.returncode, output
@@ -171,11 +170,11 @@ def iio_attr_context(uri, attr):
 
 def probe_pluto_soapy():
     """Fallback when `iio_info -s` fails (Avahi / device busy): Soapy probe text."""
-    # Do NOT wrap with the host `timeout` binary. run_text() decides whether to
-    # run in the rad-lab-sdr container by checking shutil.which(argv[0]); a host
-    # `timeout` would match and skip the container, so SoapySDRUtil would never
-    # run in the image (it is absent on the host). run_text already enforces its
-    # own subprocess timeout, so a stuck libiio scan still cannot hang the agent.
+    # Do NOT wrap with the host `timeout` binary. run_text() executes
+    # SoapySDRUtil inside the rad-lab-sdr container by argv[0] allowlist; a host
+    # `timeout` prefix would match as argv[0] and run on the host instead (where
+    # SoapySDRUtil is absent). run_text already enforces its own subprocess
+    # timeout, so a stuck libiio scan still cannot hang the agent.
 
     def _soapy(argv):
         try:
@@ -211,7 +210,7 @@ def probe_pluto_soapy():
         "firmware": fw,
         "uri": uri,
         "raw": text,
-        "tool_host": shutil.which("SoapySDRUtil") or f"docker:{IMAGE_NAME}",
+        "tool_host": f"docker:{IMAGE_NAME}",  # SDR toolchain runs only in the container
     }
 
 
@@ -240,7 +239,7 @@ def probe_pluto():
             "firmware": "",
             "uri": "",
             "raw": text + "\n" + soapy.get("raw", ""),
-            "tool_host": shutil.which("iio_info") or f"docker:{IMAGE_NAME}",
+            "tool_host": f"docker:{IMAGE_NAME}",  # SDR toolchain runs only in the container
         }
 
     uri = pluto["uri"]
@@ -271,7 +270,7 @@ def probe_pluto():
         "firmware": fw,
         "uri": uri,
         "raw": text,
-        "tool_host": shutil.which("iio_info") or f"docker:{IMAGE_NAME}",
+        "tool_host": f"docker:{IMAGE_NAME}",  # SDR toolchain runs only in the container
     }
 
 
@@ -380,35 +379,38 @@ def flash_pluto_mass_storage(frm_path: Path):
 
 
 def run_pluto_dfu(dfu_path: Path):
-    """DFU recovery only — operator must put Pluto in DFU mode first."""
-    argv = [
-        "dfu-util",
-        "-d",
-        "0456:b673,0456:b674",
-        "-a",
-        "0",
-        "-D",
-        str(dfu_path),
-    ]
-    if shutil.which("dfu-util") is None:
-        if not docker_image_exists():
-            raise SystemExit("dfu-util not on PATH; run make image")
-        argv = (
-            [
-                "docker",
-                "run",
-                "--rm",
-                "--privileged",
-                "-v",
-                "/dev/bus/usb:/dev/bus/usb",
-                "-v",
-                f"{ROOT}:{ROOT}",
-                "-w",
-                str(ROOT),
-                IMAGE_NAME,
-            ]
-            + argv
-        )
+    """DFU recovery only — operator must put Pluto in DFU mode first.
+
+    Always inside rad-lab-sdr (dfu-util is SDR toolchain; never host-side).
+    """
+    if not docker_image_exists():
+        raise SystemExit(f"{IMAGE_NAME} image missing; run make image")
+    argv = (
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-e",
+            "RAD_LAB_CONTAINER=1",
+            "--privileged",
+            "-v",
+            "/dev/bus/usb:/dev/bus/usb",
+            "-v",
+            f"{ROOT}:{ROOT}",
+            "-w",
+            str(ROOT),
+            IMAGE_NAME,
+        ]
+        + [
+            "dfu-util",
+            "-d",
+            "0456:b673,0456:b674",
+            "-a",
+            "0",
+            "-D",
+            str(dfu_path),
+        ]
+    )
     completed = subprocess.run(argv, text=True, capture_output=True)
     return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
 
@@ -694,6 +696,8 @@ def flash_pluto(board, use_dfu=False):
 
 
 def flash(board, use_dfu=False):
+    # Firmware write touches hardware — the board must be present on USB first.
+    require_hardware(board)
     if board["id"] == "hackrf":
         if use_dfu:
             raise SystemExit("HackRF DFU is manual recovery; see hil/docs/boards/hackrf.md")
