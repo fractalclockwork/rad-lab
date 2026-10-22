@@ -96,6 +96,66 @@ def test_main_refuses_without_loopback(monkeypatch):
         lab.main(["--no-prompt"])
 
 
+def test_crossboard_loopback_via_loopback_module(tmp_path, monkeypatch):
+    from harness import radboards
+    from hardware import loopback
+
+    hackrf = radboards.load_board("hackrf")
+    fake_report = {
+        "status": "pass",
+        "min_snr_db": 7.0,
+        "legs": [
+            {
+                "status": "pass",
+                "tx_board": "hackrf",
+                "rx_board": "pluto",
+                "tx_serial": "h1",
+                "rx_serial": "p1",
+                "tone_offset_hz": 100000.0,
+                "tx_gain_db": 0.0,
+                "elapsed_ms": 50.0,
+                "metrics": {"snr_db": 22.0, "peak_hz": 100000.0},
+                "verdict": {"pass": True, "snr_ok": True, "peak_ok": True},
+            },
+            {
+                "status": "pass",
+                "tx_board": "pluto",
+                "rx_board": "hackrf",
+                "tx_serial": "p1",
+                "rx_serial": "h1",
+                "tone_offset_hz": 100000.0,
+                "tx_gain_db": -30.0,
+                "elapsed_ms": 50.0,
+                "metrics": {"snr_db": 24.0, "peak_hz": 100000.0},
+                "verdict": {"pass": True, "snr_ok": True, "peak_ok": True},
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        loopback,
+        "_crossboard_loopback",
+        lambda board, no_prompt=None: [
+            loopback.loopback_record(
+                sent=f"CW_TONE_TX_{leg['tx_board'].upper()}_RX_{leg['rx_board'].upper()}",
+                expected="peak~100000.0Hz snr>=7.0dB",
+                actual=f"peak={leg['metrics']['peak_hz']:.1f}Hz snr={leg['metrics']['snr_db']:.1f}dB",
+                snr_db=leg["metrics"]["snr_db"],
+                host_monotonic_ns=1,
+                mode="hardware",
+                tx_board=leg["tx_board"],
+                rx_board=leg["rx_board"],
+                metrics=leg["metrics"],
+                verdict=leg["verdict"],
+            )
+            for leg in fake_report["legs"]
+        ],
+    )
+    records = loopback.run_loopback(hackrf, simulate=False)
+    assert len(records) == 2
+    assert records[0]["sent"] == "CW_TONE_TX_HACKRF_RX_PLUTO"
+    assert records[1]["sent"] == "CW_TONE_TX_PLUTO_RX_HACKRF"
+
+
 def test_shared_rf_mismatch():
     tx = {"center_hz": 915e6, "sample_rate": 2e6, "tone_offset_hz": 1e5, "min_snr_db": 10}
     rx = {**tx, "center_hz": 916e6}

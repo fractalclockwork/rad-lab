@@ -94,6 +94,28 @@ def run_loopback_simulated(board):
     iq = synthesize_tone(sample_rate, tone_offset_hz, n_samples, snr_db=min_snr + 15)
     metrics = measure_tone_snr(iq, sample_rate, tone_offset_hz)
     verdict = assert_tone(metrics, tone_offset_hz, min_snr)
+    if board.get("loopback_mode") == "crossboard":
+        partner_id = str(board.get("partner_board") or "pluto")
+        board_id = str(board["id"])
+        legs = (
+            (board_id, partner_id),
+            (partner_id, board_id),
+        )
+        return [
+            loopback_record(
+                sent=f"CW_TONE_TX_{tx_id.upper()}_RX_{rx_id.upper()}",
+                expected=f"peak~{tone_offset_hz}Hz snr>={min_snr}dB",
+                actual=f"peak={metrics['peak_hz']:.1f}Hz snr={metrics['snr_db']:.1f}dB",
+                snr_db=metrics["snr_db"],
+                host_monotonic_ns=time.monotonic_ns(),
+                mode="simulated",
+                tx_board=tx_id,
+                rx_board=rx_id,
+                metrics=metrics,
+                verdict=verdict,
+            )
+            for tx_id, rx_id in legs
+        ]
     return [
         loopback_record(
             sent="CW_TONE",
@@ -239,9 +261,59 @@ def _container_loopback(board):
     return result["records"]
 
 
+def _crossboard_loopback(board, no_prompt=None):
+    """Run two-leg cross-board CW loopback (board<->partner_board) via 07_crossboard_915_cw."""
+    import importlib.util
+    import os
+
+    lab_path = Path(__file__).resolve().parent / "labs" / "07_crossboard_915_cw.py"
+    spec = importlib.util.spec_from_file_location("crossboard_915_cw", lab_path)
+    lab = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab)
+
+    if no_prompt is None:
+        no_prompt = os.environ.get("RAD_LAB_NO_PROMPT") == "1"
+    report = lab.execute_crossboard_cw(no_prompt=no_prompt)
+    records = []
+    failures = []
+    for leg in report["legs"]:
+        tx_id = leg["tx_board"]
+        rx_id = leg["rx_board"]
+        tone_offset_hz = float(leg["tone_offset_hz"])
+        min_snr = float(report["min_snr_db"])
+        metrics = leg["metrics"]
+        verdict = leg["verdict"]
+        rec = loopback_record(
+            sent=f"CW_TONE_TX_{tx_id.upper()}_RX_{rx_id.upper()}",
+            expected=f"peak~{tone_offset_hz}Hz snr>={min_snr}dB",
+            actual=f"peak={metrics['peak_hz']:.1f}Hz snr={metrics['snr_db']:.1f}dB",
+            snr_db=metrics["snr_db"],
+            host_monotonic_ns=time.monotonic_ns(),
+            mode="hardware",
+            tx_board=tx_id,
+            rx_board=rx_id,
+            tx_serial=leg.get("tx_serial", ""),
+            rx_serial=leg.get("rx_serial", ""),
+            tx_gain_db=leg.get("tx_gain_db"),
+            elapsed_ms=leg.get("elapsed_ms"),
+            metrics=metrics,
+            verdict=verdict,
+        )
+        records.append(rec)
+        if leg.get("status") != "pass":
+            failures.append(
+                f"{tx_id}->{rx_id}: peak={metrics['peak_hz']:.1f}Hz snr={metrics['snr_db']:.1f}dB"
+            )
+    if failures:
+        raise RuntimeError("crossboard loopback failed: " + "; ".join(failures))
+    return records
+
+
 def run_loopback(board, simulate=False):
     if simulate:
         return run_loopback_simulated(board)
+    if board.get("loopback_mode") == "crossboard":
+        return _crossboard_loopback(board)
     return _container_loopback(board)
 
 

@@ -69,14 +69,15 @@ def gate(board_id, stage):
             f"{board_id} {previous} stage has not passed; refusing {stage}",
             f"make stage BOARD={board_id} STAGE={previous}",
         )
-    if board_id != "hackrf" and not stage_passed("hackrf", "image"):
+    board = load_board(board_id)
+    partner_id = board.get("partner_board")
+    if stage == "image" and partner_id and not stage_passed(partner_id, "image"):
         _refuse(
             board_id,
             stage,
-            f"hackrf image stage has not passed; refusing {board_id} {stage}",
-            f"{LOOPBACK_ENV}=1 make hwil BOARD=hackrf",
+            f"{partner_id} image stage has not passed; refusing {board_id} {stage}",
+            f"{LOOPBACK_ENV}=1 make hwil BOARD={partner_id}",
         )
-    board = load_board(board_id)
     env_name = board.get("requires_env") or LOOPBACK_ENV
     if stage == "image" and os.environ.get(env_name) != "1":
         _refuse(
@@ -185,17 +186,22 @@ def run_workflow(board):
 
 def run_image(board):
     simulate = os.environ.get(SIM_ENV) == "1"
+    partner_id = board.get("partner_board")
     # Simulated image skips USB and YES; cable attestation still required (gate).
     if not simulate:
         try:
             require_hardware(board)
+            if partner_id:
+                require_hardware(load_board(partner_id))
         except SystemExit as exc:
             return fail_record(
                 board,
                 "image",
                 str(exc),
                 next=(
-                    f"attach {board['id']}, or run: "
+                    f"attach {board['id']}"
+                    + (f" and {partner_id}" if partner_id else "")
+                    + ", or run: "
                     f"{LOOPBACK_ENV}=1 {SIM_ENV}=1 make hwil BOARD={board['id']}"
                 ),
             )
@@ -208,10 +214,12 @@ def run_image(board):
 
     try:
         if not simulate:
-            confirm_tx(
-                f"attenuated TX→RX loopback on {board['id']} "
-                "(conducted cable only; no antenna)"
+            tx_desc = (
+                f"attenuated cross-board TX↔RX loopback ({board['id']}↔{partner_id})"
+                if partner_id
+                else f"attenuated TX→RX loopback on {board['id']}"
             )
+            confirm_tx(f"{tx_desc} (conducted cable only; no antenna)")
         records = run_loopback(board, simulate=simulate)
     except SystemExit as exc:
         write_loopback_logs(out, [], failures=[str(exc)])

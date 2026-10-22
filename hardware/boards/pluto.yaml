@@ -27,6 +27,7 @@ rx_ms: 400
 min_snr_db: 7.0
 # SNR acceptance band: 10 dB +/- 3 dB (7-13 dB) for automated loopback testing.
 requires_env: HUMAN_LOOPBACK
+loopback_mode: same_board
 control_buses:
   - id: usb
     role: program
@@ -37,7 +38,7 @@ control_buses:
 image_paths:
   - id: tx-rx-loopback
     primary: true
-    note: TX–RX SMA cable with attenuator. Set HUMAN_LOOPBACK=1. Stages stay closed until hackrf image passes.
+    note: TX–RX SMA cable with attenuator on ADALM-PLUTO (full-duplex). Set HUMAN_LOOPBACK=1.
 phase_seeds_s:
   fixture: 2
   tx: 1

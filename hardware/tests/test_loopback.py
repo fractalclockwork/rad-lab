@@ -3,19 +3,27 @@ from harness import radboards
 
 
 def test_simulated_loopback_records_snr():
-    board = radboards.load_board("hackrf")
-    records = loopback.run_loopback(board, simulate=True)
+    pluto = radboards.load_board("pluto")
+    records = loopback.run_loopback(pluto, simulate=True)
+    assert len(records) == 1
     assert records[0]["sent"] == "CW_TONE"
     assert records[0]["mode"] == "simulated"
-    assert records[0]["snr_db"] >= board["min_snr_db"]
+    assert records[0]["snr_db"] >= pluto["min_snr_db"]
     assert records[0]["verdict"]["pass"] is True
+
+    hackrf = radboards.load_board("hackrf")
+    cb_records = loopback.run_loopback(hackrf, simulate=True)
+    assert len(cb_records) == 2
+    assert cb_records[0]["sent"] == "CW_TONE_TX_HACKRF_RX_PLUTO"
+    assert cb_records[1]["sent"] == "CW_TONE_TX_PLUTO_RX_HACKRF"
+    assert all(r["mode"] == "simulated" and r["verdict"]["pass"] is True for r in cb_records)
 
 
 def test_container_loopback_runs_in_container(monkeypatch):
     import json as _json
     import subprocess as _subprocess
 
-    board = radboards.load_board("hackrf")
+    board = radboards.load_board("pluto")
     captured = {}
 
     def fake_run(cmd, **kwargs):

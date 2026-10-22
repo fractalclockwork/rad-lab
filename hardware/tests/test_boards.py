@@ -9,9 +9,12 @@ def test_load_hackrf():
     assert board["txvga_db"] <= board["max_tx_db"]
 
 
-def test_order_hackrf_first():
-    assert radboards.ORDER[0] == "hackrf"
-    assert "pluto" in radboards.ORDER
+def test_order_pluto_first():
+    assert radboards.ORDER[0] == "pluto"
+    assert "hackrf" in radboards.ORDER
+    assert radboards.load_board("pluto")["loopback_mode"] == "same_board"
+    assert radboards.load_board("hackrf")["loopback_mode"] == "crossboard"
+    assert radboards.load_board("hackrf")["partner_board"] == "pluto"
 
 
 def test_primary_image_path():

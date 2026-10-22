@@ -28,6 +28,8 @@ rx_ms: 400
 min_snr_db: 7.0
 # SNR acceptance band: 10 dB +/- 3 dB (7-13 dB) for automated loopback testing.
 requires_env: HUMAN_LOOPBACK
+loopback_mode: crossboard
+partner_board: pluto
 control_buses:
   - id: usb
     role: program
@@ -38,7 +40,7 @@ control_buses:
 image_paths:
   - id: tx-rx-loopback
     primary: true
-    note: SMA cable through attenuator, TX port to RX port. Set HUMAN_LOOPBACK=1.
+    note: Two-leg SMA cable through attenuator to/from ADALM-PLUTO (hackrf->pluto and pluto->hackrf). Set HUMAN_LOOPBACK=1. Requires pluto image pass.
 phase_seeds_s:
   fixture: 2
   tx: 1

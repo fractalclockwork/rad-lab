@@ -8,7 +8,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARDWARE_ROOT = REPO_ROOT / "hardware"
 ROOT = REPO_ROOT
-ORDER = ("hackrf", "pluto")
+ORDER = ("pluto", "hackrf")
 STAGES = ("present", "workflow", "image")
 ACCESSORIES = ("amp", "splitter", "analyzer", "usb-vga-dac", "uv-5r-plus")
 

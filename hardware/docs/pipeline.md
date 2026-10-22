@@ -45,7 +45,7 @@ A stage writes `reports/<board>/stage.json`. The next stage on that board does n
 | `workflow` | Device opens (Soapy or CLI re-probe); TX limits recorded; `HUMAN_LOOPBACK` state noted | Sustained TX |
 | `image` | Fixture pass; short TX; RX tone SNR ≥ `min_snr_db` and peak within 10 kHz; `hil.jsonl` + JUnit | Antenna TX without loopback flag |
 
-Board order is fixed: `hackrf`, then `pluto`. Any stage on a later board is refused until `reports/hackrf/stage.json` shows `image` as `pass`.
+`present` and `workflow` stages can run on either board once its prior stage passes. For the `image` stage, full-duplex `pluto` runs same-board loopback first (`Pluto TX → pad → Pluto RX`), and half-duplex `hackrf` runs two-leg cross-board loopback (`HackRF TX → pad → Pluto RX` and `Pluto TX → pad → HackRF RX`) once `reports/pluto/stage.json` shows `image` as `pass`.
 
 ## What the image stage runs
 

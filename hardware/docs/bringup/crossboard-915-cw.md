@@ -1,6 +1,6 @@
 # HackRF↔Pluto 915 MHz CW simplex
 
-After each board’s own RX/TX path is trusted (HackRF loopback HWIL, Pluto 2 m RX/TX), run a **directed** CW exchange between them on the shared ISM cable-loopback center. This does **not** write `stage.json` and does not replace same-board `HUMAN_LOOPBACK=1 make hwil`.
+Because HackRF One is half-duplex (single `ANT` SMA port) while ADALM-PLUTO is full-duplex (separate `TX` and `RX` ports), Pluto validates its own RF chain first via same-board loopback (`HUMAN_LOOPBACK=1 make hwil BOARD=pluto`), and HackRF validates its `image` stage via this two-leg directed CW exchange to/from Pluto (`HUMAN_LOOPBACK=1 make hwil BOARD=hackrf` or standalone via `07_crossboard_915_cw.py`).
 
 ## Safety
 

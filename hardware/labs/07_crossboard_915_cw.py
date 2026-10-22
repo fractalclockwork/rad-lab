@@ -67,6 +67,31 @@ def shared_rf(tx_board, rx_board):
     }
 
 
+def best_tone_window_metrics(iq, sample_rate, tone_offset_hz, window_samples=None):
+    """Score the strongest contiguous burst window when RX buffer exceeds TX burst."""
+    iq = np.asarray(iq, dtype=np.complex64)
+    if window_samples is None:
+        window_samples = min(iq.size, max(4096, int(sample_rate * 0.08)))
+    if iq.size <= window_samples:
+        return measure_tone_snr(iq, sample_rate, tone_offset_hz)
+    step = max(4096, window_samples // 2)
+    best = None
+    for start in range(0, iq.size - window_samples + 1, step):
+        # Cross-board independent crystals can have ~10 ppm offset (~9 kHz at 915 MHz);
+        # use a 10 kHz tone bin half-width so tone_power captures the offset tone.
+        m = measure_tone_snr(
+            iq[start : start + window_samples],
+            sample_rate,
+            tone_offset_hz,
+            bin_half_width_hz=PEAK_TOLERANCE_HZ,
+        )
+        if best is None or m["snr_db"] > best["snr_db"]:
+            best = m
+    return best or measure_tone_snr(
+        iq, sample_rate, tone_offset_hz, bin_half_width_hz=PEAK_TOLERANCE_HZ
+    )
+
+
 def evaluate_leg(metrics, tone_offset_hz, min_snr_db, tolerance_hz=PEAK_TOLERANCE_HZ):
     """Pure pass/fail from measure_tone_snr metrics (no Soapy)."""
     return evaluate_tone(metrics, tone_offset_hz, min_snr_db, tolerance_hz)
@@ -155,29 +180,34 @@ def run_leg_hardware(tx_id, rx_id):
     try:
         rx_dev.activateStream(rx_stream)
         tx_dev.activateStream(tx_stream)
-        tx_mtu = min(n_tx, 1024 * 8)
+        tx_mtu = min(n_tx, 1024 * 32)
+        rx_mtu = 1024 * 16
+        # Drain pre-TX buffered samples from the RX DMA ring before starting TX,
+        # then interleave TX writes and RX reads into rx_buf; best_tone_window_metrics
+        # locates the active CW burst window regardless of driver DMA latency.
+        scratch = np.zeros(rx_mtu, dtype=np.complex64)
+        for _ in range(16):
+            rx_dev.readStream(rx_stream, [scratch], rx_mtu, timeoutUs=5000)
+
         sent = 0
-        while sent < n_tx:
-            chunk = tx_iq[sent : sent + tx_mtu]
-            sr = tx_dev.writeStream(tx_stream, [chunk], int(chunk.size))
-            if sr.ret < 0:
-                raise SystemExit(f"TX writeStream failed: {sr.ret}")
-            if sr.ret == 0:
-                if (time.monotonic() - started) * 1000 > max_tx_ms * 2:
-                    raise SystemExit("TX timed out")
-                continue
-            sent += int(sr.ret)
-            if (time.monotonic() - started) * 1000 > max_tx_ms * 2:
-                break
-        deadline = time.monotonic() + (rx_ms / 1000.0) + 1.0
-        while got < n_rx and time.monotonic() < deadline:
-            sr = rx_dev.readStream(rx_stream, [rx_buf[got:]], n_rx - got)
-            if sr.ret > 0:
-                got += int(sr.ret)
-            elif sr.ret == -1:
-                continue
-            else:
-                break
+        deadline = time.monotonic() + (max(max_tx_ms, rx_ms) / 1000.0) + 1.5
+        while (sent < n_tx or got < n_rx) and time.monotonic() < deadline:
+            if sent < n_tx:
+                chunk = tx_iq[sent : sent + tx_mtu]
+                sr_tx = tx_dev.writeStream(
+                    tx_stream, [chunk], int(chunk.size), timeoutUs=50000
+                )
+                if sr_tx.ret < 0 and sr_tx.ret != -1:
+                    raise SystemExit(f"TX writeStream failed: {sr_tx.ret}")
+                if sr_tx.ret > 0:
+                    sent += int(sr_tx.ret)
+            if got < n_rx:
+                to_read = min(rx_mtu, n_rx - got)
+                sr_rx = rx_dev.readStream(
+                    rx_stream, [rx_buf[got:]], to_read, timeoutUs=10000
+                )
+                if sr_rx.ret > 0:
+                    got += int(sr_rx.ret)
     finally:
         for close_dev, stream in ((tx_dev, tx_stream), (rx_dev, rx_stream)):
             try:
@@ -188,7 +218,7 @@ def run_leg_hardware(tx_id, rx_id):
 
     if got < 1024:
         raise SystemExit(f"RX captured only {got} samples")
-    metrics = measure_tone_snr(rx_buf[:got], sample_rate, tone_offset_hz)
+    metrics = best_tone_window_metrics(rx_buf[:got], sample_rate, tone_offset_hz)
     verdict = evaluate_leg(metrics, tone_offset_hz, min_snr)
     result = {
         "status": "pass" if verdict["pass"] else "fail",
@@ -250,6 +280,41 @@ def _docker_run_leg(tx_id, rx_id):
     return result
 
 
+def execute_crossboard_cw(no_prompt=False, out_dir=None, stdin=None):
+    """Run both HackRF<->Pluto CW legs, write 915_cw_report.json, and return the report dict."""
+    hackrf = load_board("hackrf")
+    pluto = load_board("pluto")
+    rf = shared_rf(hackrf, pluto)
+
+    legs = []
+    for tx_id, rx_id, message in LEGS:
+        if prompt_wire(message, stdin=stdin, no_prompt=no_prompt) != 0:
+            raise RuntimeError("aborted at cable prompt")
+        print(f"Running leg {tx_id} TX → {rx_id} RX …", file=sys.stderr, flush=True)
+        legs.append(_docker_run_leg(tx_id, rx_id))
+
+    both_pass = all(leg.get("status") == "pass" for leg in legs)
+    report = {
+        "status": "pass" if both_pass else "fail",
+        "at": datetime.now(timezone.utc).isoformat(),
+        "mode": "crossboard_cw",
+        "center_hz": rf["center_hz"],
+        "sample_rate": rf["sample_rate"],
+        "tone_offset_hz": rf["tone_offset_hz"],
+        "min_snr_db": rf["min_snr_db"],
+        "legs": legs,
+        "note": (
+            "Two-leg HackRF↔Pluto 915 MHz CW loopback. "
+            "Pass when both HackRF→Pluto and Pluto→HackRF CW legs meet SNR and peak."
+        ),
+    }
+    target_dir = out_dir or (ROOT / "reports" / "crossboard")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    report_path = target_dir / "915_cw_report.json"
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
+    return report
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(
         description="HackRF↔Pluto 915 MHz CW simplex (attenuated cable only)"
@@ -282,44 +347,17 @@ def main(argv=None):
         return run_leg_hardware(args.tx, args.rx)
 
     assert_loopback()
-    require_rf("hackrf")
     require_rf("pluto")
     confirm_tx(
         "915 MHz CW crossboard TX "
         "(attenuated cable only; no antenna on either board)"
     )
-    hackrf = load_board("hackrf")
-    pluto = load_board("pluto")
-    rf = shared_rf(hackrf, pluto)
-
-    legs = []
-    for tx_id, rx_id, message in LEGS:
-        if prompt_wire(message, no_prompt=args.no_prompt) != 0:
-            return 1
-        print(f"Running leg {tx_id} TX → {rx_id} RX …", file=sys.stderr, flush=True)
-        legs.append(_docker_run_leg(tx_id, rx_id))
-
-    both_pass = all(leg.get("status") == "pass" for leg in legs)
-    report = {
-        "status": "pass" if both_pass else "fail",
-        "at": datetime.now(timezone.utc).isoformat(),
-        "mode": "crossboard_cw",
-        "center_hz": rf["center_hz"],
-        "sample_rate": rf["sample_rate"],
-        "tone_offset_hz": rf["tone_offset_hz"],
-        "min_snr_db": rf["min_snr_db"],
-        "legs": legs,
-        "note": (
-            "Lesson lab; does not write stage.json. "
-            "Pass when both HackRF→Pluto and Pluto→HackRF CW legs meet SNR and peak."
-        ),
-    }
-    out_dir = args.out_dir or (ROOT / "reports" / "crossboard")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    report_path = out_dir / "915_cw_report.json"
-    report_path.write_text(json.dumps(report, indent=2) + "\n")
+    try:
+        report = execute_crossboard_cw(no_prompt=args.no_prompt, out_dir=args.out_dir)
+    except RuntimeError:
+        return 1
     print(json.dumps(report, indent=2))
-    return 0 if both_pass else 1
+    return 0 if report["status"] == "pass" else 1
 
 
 if __name__ == "__main__":

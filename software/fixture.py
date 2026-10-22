@@ -82,7 +82,8 @@ def measure_tone_snr(iq, sample_rate, tone_offset_hz, bin_half_width_hz=None):
     # Exclude band edges where LO leakage / DC-offset images can dominate the
     # argmax on weak loopback signals (direct-conversion receivers inject
     # artifacts near +/- Nyquist that are not the tone under test).
-    edge_free = dc_free & (np.abs(freqs) < sample_rate / 2.0 - sample_rate / n * 10)
+    edge_guard_hz = max(sample_rate / n * 10, sample_rate * 0.01)
+    edge_free = dc_free & (np.abs(freqs) < sample_rate / 2.0 - edge_guard_hz)
     if np.any(edge_free):
         peak_hz = float(freqs[edge_free][np.argmax(power[edge_free])])
     elif np.any(dc_free):

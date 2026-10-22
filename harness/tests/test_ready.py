@@ -27,8 +27,8 @@ def test_require_rf_ok_after_image(tmp_path, monkeypatch):
 
 def test_require_lessons_needs_both_boards(tmp_path, monkeypatch):
     _patch_roots(monkeypatch, tmp_path)
-    radboards.write_stage("hackrf", "image", {"status": "pass", "stage": "image"})
-    with pytest.raises(SystemExit, match="pluto"):
-        ready.require_lessons()
     radboards.write_stage("pluto", "image", {"status": "pass", "stage": "image"})
+    with pytest.raises(SystemExit, match="hackrf"):
+        ready.require_lessons()
+    radboards.write_stage("hackrf", "image", {"status": "pass", "stage": "image"})
     ready.require_lessons()

@@ -49,4 +49,5 @@ lesson:
 
 check:
 	$(PYTHON) -m pytest -q
+	$(MAKE) sim BOARD=pluto
 	$(MAKE) sim BOARD=hackrf
