@@ -1,10 +1,12 @@
 # Documentation
 
-Docs have moved into the two workflow trees:
+Docs live in the role trees and in shared methodology:
 
-| Workflow | Index |
+| Topic | Index |
 | --- | --- |
-| HIL bring-up | [`hil/docs/`](../hil/docs/README.md) and [`hil/docs/bringup/`](../hil/docs/bringup/README.md) |
-| Lesson development | [`learn/`](../learn/README.md) |
+| Methodology (general process) | [`methodology/`](methodology/README.md) — [theory](methodology/evidence-gated-roles.md), [manifesto](methodology/manifesto.md), [checklist](methodology/checklist.md) |
+| Human (human-in-the-loop) | [`human/`](../human/README.md) |
+| Hardware (HWIL) | [`hardware/docs/`](../hardware/docs/README.md) and [`hardware/docs/bringup/`](../hardware/docs/bringup/README.md) |
+| Lesson | [`lesson/`](../lesson/README.md) |
 
-Root overview: [`README.md`](../README.md).
+Root overview: [`README.md`](../README.md). Role router: [`AGENTS.md`](../AGENTS.md).

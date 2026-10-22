@@ -1,0 +1,46 @@
+id: hackrf
+title: HackRF One
+vendor: Great Scott Gadgets
+part: HackRF One
+usb_vendor: "1d50"
+usb_product: "6089"
+soapy_driver: hackrf
+device_name: HackRF One
+baud: null
+firmware_target: "2026.01.3"
+firmware_release_id: hackrf-2026.01.3
+firmware_bin: hackrf_one_usb.bin
+firmware_dfu: hackrf_one_usb.dfu
+firmware_bin_path: archive/cache/sdk/hackrf-2026.01.3/firmware-bin/hackrf_one_usb.bin
+firmware_dfu_path: archive/cache/sdk/hackrf-2026.01.3/firmware-bin/hackrf_one_usb.dfu
+# Known DUT serial from lab bring-up (override with HACKRF_SERIAL).
+expected_serial: "0000000000000000a06063c823864f5f"
+# ISM test tone for attenuated cable loopback only. Do not radiate from an antenna.
+center_hz: 915000000
+sample_rate: 2000000
+tone_offset_hz: 100000
+rx_lna_db: 16
+rx_vga_db: 16
+txvga_db: 0
+max_tx_db: 4
+max_tx_ms: 200
+rx_ms: 400
+min_snr_db: 7.0
+# SNR acceptance band: 10 dB +/- 3 dB (7-13 dB) for automated loopback testing.
+requires_env: HUMAN_LOOPBACK
+control_buses:
+  - id: usb
+    role: program
+    tool: libhackrf
+  - id: soapy
+    role: runtime
+    tool: SoapySDR
+image_paths:
+  - id: tx-rx-loopback
+    primary: true
+    note: SMA cable through attenuator, TX port to RX port. Set HUMAN_LOOPBACK=1.
+phase_seeds_s:
+  fixture: 2
+  tx: 1
+  rx: 2
+  analyze: 1

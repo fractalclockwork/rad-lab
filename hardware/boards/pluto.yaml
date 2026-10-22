@@ -1,0 +1,45 @@
+id: pluto
+title: ADALM-PLUTO
+vendor: Analog Devices
+part: ADALM-PLUTO
+usb_vendor: "0456"
+usb_product: "b673"
+soapy_driver: plutosdr
+device_name: ADALM-PLUTO
+firmware_target: "v0.39"
+firmware_release_id: plutosdr-fw-v0.39
+firmware_bin: pluto.frm
+firmware_dfu: pluto.dfu
+firmware_bin_path: archive/cache/sdk/plutosdr-fw-v0.39/pluto.frm
+firmware_dfu_path: archive/cache/sdk/plutosdr-fw-v0.39/pluto.dfu
+# Known DUT serial from lab bring-up (override with PLUTO_SERIAL).
+expected_serial: "1044734c96050013eaff200049464f471d"
+# ISM test tone for attenuated cable loopback only. Do not radiate from an antenna.
+center_hz: 915000000
+sample_rate: 2000000
+tone_offset_hz: 100000
+rx_lna_db: 30
+rx_vga_db: 0
+txvga_db: -30
+max_tx_db: -5
+max_tx_ms: 200
+rx_ms: 400
+min_snr_db: 7.0
+# SNR acceptance band: 10 dB +/- 3 dB (7-13 dB) for automated loopback testing.
+requires_env: HUMAN_LOOPBACK
+control_buses:
+  - id: usb
+    role: program
+    tool: iio
+  - id: soapy
+    role: runtime
+    tool: SoapySDR
+image_paths:
+  - id: tx-rx-loopback
+    primary: true
+    note: TX–RX SMA cable with attenuator. Set HUMAN_LOOPBACK=1. Stages stay closed until hackrf image passes.
+phase_seeds_s:
+  fixture: 2
+  tx: 1
+  rx: 2
+  analyze: 1

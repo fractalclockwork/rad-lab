@@ -19,16 +19,14 @@ jobs:
       - name: Pytest and fixture
         run: make check
       - name: Simulated image stage
-        env:
-          PYTHONPATH: hil/scripts
         run: |
-          # Exercise gates + simulated HIL without USB hardware.
+          # Exercise gates + simulated HWIL image without USB hardware.
           python - <<'PY'
-          import radboards
+          from harness import radboards
           radboards.write_stage("hackrf", "present", {"status": "pass", "stage": "present"})
           radboards.write_stage("hackrf", "workflow", {"status": "pass", "stage": "workflow"})
           PY
-          HIL_LOOPBACK=1 RAD_LAB_HIL_SIM=1 make hil BOARD=hackrf
+          HUMAN_LOOPBACK=1 RAD_LAB_HWIL_SIM=1 make hwil BOARD=hackrf
 
   container:
     runs-on: ubuntu-latest

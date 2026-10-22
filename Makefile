@@ -1,5 +1,6 @@
 BOARD ?= hackrf
 STAGE ?= present
+LAB ?= 01
 export BOARD
 PYTHON ?= python3
 ifneq ($(wildcard .venv/bin/python),)
@@ -7,9 +8,9 @@ PYTHON := .venv/bin/python
 endif
 
 IMAGE ?= rad-lab-sdr
-export PYTHONPATH := $(CURDIR)/hil/scripts:$(PYTHONPATH)
+export PYTHONPATH := $(CURDIR):$(PYTHONPATH)
 
-.PHONY: archive archive-image image stage sim hil firmware check venv sdr
+.PHONY: archive archive-image image stage sim hwil firmware check venv sdr lesson
 
 venv:
 	$(PYTHON) -m venv .venv
@@ -17,35 +18,34 @@ venv:
 	.venv/bin/pip install -r requirements.txt
 
 archive:
-	$(PYTHON) hil/scripts/archive.py
+	$(PYTHON) -m environment.archive
 
 image: archive
 	docker build -t $(IMAGE) -f docker/sdr/Dockerfile .
 
 archive-image: image
-	$(PYTHON) hil/scripts/archive.py --save-image
+	$(PYTHON) -m environment.archive --save-image
 
-# Container-only SDR dev-run. Every SDR binary (hackrf_info / hackrf_transfer /
-# SoapySDRUtil / iio_info / dfu-util, plus the bring-up labs) executes inside
-# rad-lab-sdr; the dev-host never exercises RF hardware. `lsusb` and report-file
-# writes remain host-side informational operations.
 sdr:
-	$(PYTHON) hil/scripts/sdr_run.py $(SRC) $(ARGS)
+	$(PYTHON) -m environment.sdr_run $(SRC) $(ARGS)
 
 stage:
-	$(PYTHON) hil/scripts/stage.py --board $(BOARD) --stage $(STAGE)
+	$(PYTHON) -m hardware.stages --board $(BOARD) --stage $(STAGE)
 
 sim:
-	RAD_LAB_HIL_SIM=1 $(PYTHON) -c "from radboards import load_board; from fixture import run_fixture; print(run_fixture(load_board('$(BOARD)')))"
+	RAD_LAB_HWIL_SIM=1 $(PYTHON) -c "from harness.radboards import load_board; from software.fixture import run_fixture; print(run_fixture(load_board('$(BOARD)')))"
 
 build:
-	@echo "SDR boards have no bitstream build; use make hil after present/workflow."
+	@echo "SDR boards have no bitstream build; use make hwil after present/workflow."
 
-hil:
-	$(PYTHON) hil/scripts/stage.py --board $(BOARD) --stage image
+hwil:
+	$(PYTHON) -m hardware.stages --board $(BOARD) --stage image
 
 firmware:
-	$(PYTHON) hil/scripts/firmware.py --board $(BOARD)
+	$(PYTHON) -m hardware.firmware --board $(BOARD)
+
+lesson:
+	$(PYTHON) $$(ls lesson/labs/$(LAB)_*.py | head -1)
 
 check:
 	$(PYTHON) -m pytest -q
