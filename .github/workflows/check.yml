@@ -21,11 +21,14 @@ jobs:
       - name: Simulated image stage
         run: |
           # Exercise gates + simulated HWIL image without USB hardware.
+          # HackRF image is cross-board and stays closed until Pluto image passes.
           python - <<'PY'
           from harness import radboards
-          radboards.write_stage("hackrf", "present", {"status": "pass", "stage": "present"})
-          radboards.write_stage("hackrf", "workflow", {"status": "pass", "stage": "workflow"})
+          for board in ("pluto", "hackrf"):
+              radboards.write_stage(board, "present", {"status": "pass", "stage": "present"})
+              radboards.write_stage(board, "workflow", {"status": "pass", "stage": "workflow"})
           PY
+          HUMAN_LOOPBACK=1 RAD_LAB_HWIL_SIM=1 make hwil BOARD=pluto
           HUMAN_LOOPBACK=1 RAD_LAB_HWIL_SIM=1 make hwil BOARD=hackrf
 
   container:
